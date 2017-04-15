@@ -144,12 +144,12 @@ procedure DoPartSetColorBG(var AParts: TATLineParts; AColor: TColor; AForceColor
 implementation
 
 uses
+  {$IFDEF Win32}
+  Windows,
+  {$IFEND}
   Math,
   LCLType,
-  LCLIntf
-  {$IFDEF Win32}
-  ,Windows
-  {$IFEND};
+  LCLIntf;
 
 var
   _Pen: TPen = nil;
@@ -577,6 +577,7 @@ var
   DxPointer: PInteger;
   {$IFDEF Win32}
   DrawingParams: TDRAWTEXTPARAMS;
+  BufS: WideString;
   {$IFEND}
 begin
   if Str='' then Exit;
@@ -660,6 +661,7 @@ begin
 
       Buf:= UTF8Encode(SRemoveHexChars(PartStr));
       {$IFDEF Win32}
+      BufS := UTF8Encode(Buf);
       {$ELSE}
       SReplaceAllTabsToOneSpace(Buf);
       {$IFEND}
@@ -673,11 +675,11 @@ begin
       DrawingParams.iTabLength := ATabSize;
       DrawingParams.iLeftMargin := 0;
       DrawingParams.iRightMargin := 0;
-      DrawingParams.uiLengthDrawn := Length(Buf);
-      Windows.DrawTextEx(C.Handle,
-        PChar(Buf),
-        Length(Buf),
-        @PartRect,
+      DrawingParams.uiLengthDrawn := Length(BufS);
+      Windows.DrawTextExW(C.Handle,
+        PWideChar(BufS),
+        Length(BufS),
+        PartRect,
         DT_NOCLIP or DT_TABSTOP or DT_EXPANDTABS,
         @DrawingParams);
       {$ELSE}
