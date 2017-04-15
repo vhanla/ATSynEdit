@@ -146,7 +146,10 @@ implementation
 uses
   Math,
   LCLType,
-  LCLIntf;
+  LCLIntf
+  {$IFDEF Win32}
+  ,Windows
+  {$IFEND};
 
 var
   _Pen: TPen = nil;
@@ -288,17 +291,17 @@ begin
   if P1.Y=P2.Y then
   begin
     //paint polyline, 4 points, horz line and 2 edges
-    Points[1]:= Point(P1.X+2, P1.Y);
-    Points[2]:= Point(P2.X-2, P2.Y);
+    Points[1]:= Types.Point(P1.X+2, P1.Y);
+    Points[2]:= Types.Point(P2.X-2, P2.Y);
     if AtDown then
     begin
-      Points[0]:= Point(P1.X, P1.Y-2);
-      Points[3]:= Point(P2.X+1, P2.Y-3);
+      Points[0]:= Types.Point(P1.X, P1.Y-2);
+      Points[3]:= Types.Point(P2.X+1, P2.Y-3);
     end
     else
     begin
-      Points[0]:= Point(P1.X, P1.Y+2);
-      Points[3]:= Point(P2.X+1, P2.Y+3);
+      Points[0]:= Types.Point(P1.X, P1.Y+2);
+      Points[3]:= Types.Point(P2.X+1, P2.Y+3);
     end;
     C.Polyline(Points);
   end
@@ -324,7 +327,7 @@ begin
     begin
       y:= P2.Y + sign * cWaveInc[(x-P1.X) div 2 mod cWavePeriod];
       SetLength(Points, Length(Points)+1);
-      Points[Length(Points)-1]:= Point(x, y);
+      Points[Length(Points)-1]:= Types.Point(x, y);
     end;
 
   C.Pen.Color:= Color;
@@ -408,23 +411,23 @@ begin
   case Side of
     cSideDown:
       CanvasLineEx(C, Color, Style,
-        Point(R.Left, R.Bottom),
-        Point(R.Right, R.Bottom),
+        Types.Point(R.Left, R.Bottom),
+        Types.Point(R.Right, R.Bottom),
         true);
     cSideLeft:
       CanvasLineEx(C, Color, Style,
-        Point(R.Left, R.Top),
-        Point(R.Left, R.Bottom),
+        Types.Point(R.Left, R.Top),
+        Types.Point(R.Left, R.Bottom),
         false);
     cSideRight:
       CanvasLineEx(C, Color, Style,
-        Point(R.Right, R.Top),
-        Point(R.Right, R.Bottom),
+        Types.Point(R.Right, R.Top),
+        Types.Point(R.Right, R.Bottom),
         true);
     cSideUp:
       CanvasLineEx(C, Color, Style,
-        Point(R.Left, R.Top),
-        Point(R.Right, R.Top),
+        Types.Point(R.Left, R.Top),
+        Types.Point(R.Right, R.Top),
         false);
   end;
 end;
@@ -500,11 +503,11 @@ begin
   begin
     if OptUnprintedEndArrowOrDot then
       CanvasArrowDown(C,
-        Rect(APoint.X, APoint.Y, APoint.X+ACharSize.X, APoint.Y+ACharSize.Y),
+        Types.Rect(APoint.X, APoint.Y, APoint.X+ACharSize.X, APoint.Y+ACharSize.Y),
         AColorFont)
     else
       CanvasUnprintedSpace(C,
-        Rect(APoint.X, APoint.Y, APoint.X+ACharSize.X, APoint.Y+ACharSize.Y),
+        Types.Rect(APoint.X, APoint.Y, APoint.X+ACharSize.X, APoint.Y+ACharSize.Y),
         OptUnprintedEndDotScale,
         AColorFont);
   end;
@@ -572,6 +575,9 @@ var
   PartRect: TRect;
   Buf: AnsiString;
   DxPointer: PInteger;
+  {$IFDEF Win32}
+  DrawingParams: TDRAWTEXTPARAMS;
+  {$IFEND}
 begin
   if Str='' then Exit;
 
@@ -610,7 +616,7 @@ begin
     DoPaintHexChars(C,
       Str,
       @Dx[0],
-      Point(PosX, PosY),
+      Types.Point(PosX, PosY),
       ACharSize,
       AColorHex,
       C.Brush.Color
@@ -646,19 +652,35 @@ begin
       C.Brush.Color:= PartPtr^.ColorBG;
       C.Font.Style:= PartFontStyle;
 
-      PartRect:= Rect(
+      PartRect:= Types.Rect(
         PosX+PixOffset1,
         PosY,
         PosX+PixOffset2,
         PosY+ACharSize.Y);
 
       Buf:= UTF8Encode(SRemoveHexChars(PartStr));
+      {$IFDEF Win32}
+      {$ELSE}
       SReplaceAllTabsToOneSpace(Buf);
+      {$IFEND}
       if CanvasTextOutNeedsOffsets(C, PartStr, ANeedOffsets) then
         DxPointer:= @Dx[PartOffset]
       else
         DxPointer:= nil;
 
+      {$IFDEF Win32}
+      DrawingParams.cbSize := SizeOf(TDRAWTEXTPARAMS);
+      DrawingParams.iTabLength := ATabSize;
+      DrawingParams.iLeftMargin := 0;
+      DrawingParams.iRightMargin := 0;
+      DrawingParams.uiLengthDrawn := Length(Buf);
+      Windows.DrawTextEx(C.Handle,
+        PChar(Buf),
+        Length(Buf),
+        @PartRect,
+        DT_NOCLIP or DT_TABSTOP or DT_EXPANDTABS,
+        @DrawingParams);
+      {$ELSE}
       ExtTextOut(C.Handle,
         PosX+PixOffset1,
         PosY+ATextOffsetFromLine,
@@ -667,11 +689,12 @@ begin
         PChar(Buf),
         Length(Buf),
         DxPointer);
+      {$IFEND}
 
       DoPaintHexChars(C,
         PartStr,
         @Dx[PartOffset],
-        Point(
+        Types.Point(
           PosX+PixOffset1,
           PosY+ATextOffsetFromLine),
         ACharSize,
@@ -689,7 +712,7 @@ begin
     end;
 
   if AShowUnprintable then
-    DoPaintUnprintedChars(C, Str, ListInt, Point(PosX, PosY), ACharSize, AColorUnprintable);
+    DoPaintUnprintedChars(C, Str, ListInt, Types.Point(PosX, PosY), ACharSize, AColorUnprintable);
 
   AStrWidth:= ListInt[High(ListInt)];
 
@@ -749,9 +772,9 @@ begin
   C.Brush.Color:= AColor;
   C.Pen.Color:= AColor;
   C.Polygon([
-    Point(ACoord.X, ACoord.Y),
-    Point(ACoord.X+ASize*2, ACoord.Y),
-    Point(ACoord.X+ASize, ACoord.Y+ASize)
+    Types.Point(ACoord.X, ACoord.Y),
+    Types.Point(ACoord.X+ASize*2, ACoord.Y),
+    Types.Point(ACoord.X+ASize, ACoord.Y+ASize)
     ]);
 end;
 
@@ -760,9 +783,9 @@ begin
   C.Brush.Color:= AColor;
   C.Pen.Color:= AColor;
   C.Polygon([
-    Point(ACoord.X, ACoord.Y),
-    Point(ACoord.X+ASize, ACoord.Y+ASize),
-    Point(ACoord.X, ACoord.Y+ASize*2)
+    Types.Point(ACoord.X, ACoord.Y),
+    Types.Point(ACoord.X+ASize, ACoord.Y+ASize),
+    Types.Point(ACoord.X, ACoord.Y+ASize*2)
     ]);
 end;
 
